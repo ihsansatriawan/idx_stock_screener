@@ -1,0 +1,27 @@
+# Core dependencies for IDX Stock Screener
+
+# Data fetching
+yfinance>=0.2.30
+
+# Technical analysis
+pandas-ta>=0.4.71b0
+
+# Data processing
+pandas>=2.2.0
+numpy>=1.26.0
+
+# Google Sheets integration
+gspread>=5.10.0
+google-auth>=2.22.0
+
+# Configuration
+pyyaml>=6.0
+
+# Utilities
+python-dateutil>=2.8.2
+pytz>=2023.3
+tqdm>=4.65.0
+colorama>=0.4.6
+
+# Testing
+pytest>=7.4.0
