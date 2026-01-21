@@ -8,7 +8,11 @@ logger = get_logger()
 
 def get_universe(config: dict) -> List[str]:
     """
-    Get validated stock universe from configuration.
+    Get validated stock universe from configuration or dynamic sources.
+
+    Supports two modes:
+    - 'static': Use hardcoded tickers from config (original behavior)
+    - 'dynamic': Fetch from APIs with caching and fallback
 
     Args:
         config: Configuration dictionary
@@ -23,7 +27,22 @@ def get_universe(config: dict) -> List[str]:
         tickers = get_universe(config)
         # Returns: ['BBCA', 'BBRI', 'BMRI', ...]
     """
-    tickers = config.get('universe', {}).get('tickers', [])
+    universe_config = config.get('universe', {})
+    mode = universe_config.get('mode', 'static')
+
+    if mode == 'dynamic':
+        from src.stock_list_fetcher import StockListFetcher
+
+        fetcher = StockListFetcher(config)
+        try:
+            tickers = fetcher.fetch(use_cache=universe_config.get('cache_enabled', True))
+            logger.info(f"Dynamic universe loaded: {len(tickers)} stocks")
+            return tickers
+        except Exception as e:
+            logger.warning(f"Dynamic fetch failed: {e}, falling back to static config")
+
+    # Static mode (original behavior) or fallback
+    tickers = universe_config.get('tickers', [])
 
     if not tickers:
         raise ValueError("No tickers found in configuration")

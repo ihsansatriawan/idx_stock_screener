@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-IDX Stock Screener is an automated Indonesian stock screening system that scans 20 IDX stocks and outputs TOP 5 recommendations with Entry/TP/SL signals. The system enforces strict risk management (max 2% SL, min 1:3 RR ratio) and combines technical analysis with institutional proxy scoring.
+IDX Stock Screener is an automated Indonesian stock screening system that scans IDX stocks and outputs TOP 5 recommendations with Entry/TP/SL signals. The system supports dynamic universe fetching from IDX API (800+ stocks) or static configuration. It enforces strict risk management (max 2% SL, min 1:3 RR ratio) and combines technical analysis with institutional proxy scoring.
 
 ## Running the Screener
 
@@ -36,8 +36,19 @@ All behavior is controlled via `config.yaml` (gitignored). Copy from `config.yam
 **Critical parameters:**
 - `risk.max_sl_percent`: 2.0 (NEVER exceed - stocks auto-rejected if SL > 2%)
 - `risk.min_rr_ratio`: 3.0 (minimum 1:3 RR - stocks auto-rejected if below)
-- `universe.tickers`: List of 4-letter IDX tickers (without `.JK` suffix)
+- `universe.mode`: "dynamic" or "static" (dynamic fetches from IDX API)
+- `universe.tickers`: List of 4-letter IDX tickers (fallback for static mode)
 - `google_sheets.enabled`: false by default (requires Google Cloud setup)
+
+**Dynamic universe configuration:**
+```yaml
+universe:
+  mode: "dynamic"              # Fetch from IDX API
+  source_priority: [idx, static, config]  # Fallback order
+  cache_ttl_hours: 24          # Cache stock list for 24 hours
+  # index_filter: "LQ45"       # Optional: filter to specific index
+  # max_stocks: 50             # Optional: limit number of stocks
+```
 
 **Adjusting screening criteria:**
 ```yaml
@@ -56,7 +67,7 @@ The main orchestrator executes this sequence:
 
 1. **Config & Validation** → `src/config.py`
 2. **Logging Setup** → `src/logger.py` (colored console + daily file)
-3. **Universe Loading** → `src/universe.py` (20 tickers from config)
+3. **Universe Loading** → `src/universe.py` + `src/stock_list_fetcher.py` (dynamic or static)
 4. **Data Fetching** → `src/data_fetcher.py` (Yahoo Finance via yfinance)
 5. **Technical Indicators** → `src/technical.py` (all 9 indicators)
 6. **Initial Filter** → `src/screener.py` (Supertrend, RSI, Volume, EMA filters)
@@ -68,11 +79,13 @@ The main orchestrator executes this sequence:
 ### Data Flow
 
 ```
+IDX API / Static File / Config (Stock List)
+    ↓
 Yahoo Finance (60d OHLCV)
     ↓
 Technical Indicators (9 indicators enriched to DataFrame)
     ↓
-Initial Filter (8-12 candidates from 20 stocks)
+Initial Filter (candidates from universe)
     ↓
 Institutional Score (0-100 composite score)
     ↓
@@ -88,8 +101,14 @@ Output (JSON console + optional Google Sheets)
 ### Module Responsibilities
 
 **Data Layer:**
+- `stock_list_fetcher.py`: **StockListFetcher** class fetches stock lists from multiple sources
+  - **IDXProvider**: Fetches from idx.co.id API (800+ stocks)
+  - **StaticFileProvider**: Reads from `data/idx_stocks.json`
+  - **ConfigProvider**: Uses tickers from config.yaml (fallback)
+  - **StockListCache**: Caches stock list for 24 hours (configurable)
+  - **StockListFilter**: Filters by index (LQ45, IDX30), sector, max_stocks
 - `data_fetcher.py`: Fetches OHLCV from Yahoo Finance, validates data quality (min 40 rows, no excessive zero volumes, sorted dates)
-- `universe.py`: Converts 4-letter IDX tickers to Yahoo format (adds `.JK` suffix)
+- `universe.py`: Orchestrates stock list loading (dynamic or static) and converts to Yahoo format (adds `.JK` suffix)
 
 **Analysis Layer:**
 - `technical.py`: **TechnicalIndicators** class calculates all indicators using pandas-ta
@@ -170,9 +189,20 @@ technical:
 
 ### Adding New Stock to Universe
 
-Edit `config.yaml`:
+**Dynamic mode** (recommended): Stocks are automatically fetched from IDX API. To filter:
 ```yaml
 universe:
+  mode: "dynamic"
+  index_filter: "LQ45"    # Only LQ45 stocks
+  # Or use exclude_tickers to blacklist specific stocks
+  exclude_tickers:
+    - GOTO
+```
+
+**Static mode**: Edit `config.yaml`:
+```yaml
+universe:
+  mode: "static"
   tickers:
     - BBCA
     - NEWSTOCK  # Must be 4-letter IDX ticker
@@ -254,15 +284,15 @@ Logs written to `logs/screener_YYYYMMDD.log` with WIB timestamps.
 ## MVP Scope
 
 **Included:**
-- 20-stock universe
+- Dynamic stock universe from IDX API (800+ stocks) with caching
+- Static universe fallback (configurable tickers)
 - Full technical analysis (9 indicators)
 - Institutional proxy scoring
 - Risk management enforcement
 - Console + Google Sheets output
 
 **Deferred (post-MVP):**
-- 100-stock universe
 - Additional Sheets tabs (FULL_ANALYSIS, REJECTED, etc.)
 - Performance tracking/backtesting
 - Telegram/WhatsApp notifications
-- Data caching and parallel fetching
+- Parallel data fetching

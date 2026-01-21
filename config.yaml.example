@@ -8,6 +8,32 @@ google_sheets:
   output_tab_name: "TOP_5"
 
 universe:
+  # Mode: 'dynamic' fetches from APIs, 'static' uses tickers list below
+  mode: "dynamic"
+
+  # Source priority for dynamic mode (tried in order until one succeeds)
+  # Options: idx (IDX API), static (local file), config (tickers below)
+  source_priority:
+    - idx
+    - static
+    - config
+
+  # Local file path for 'static' provider
+  static_file: "data/idx_stocks.json"
+
+  # Cache settings for dynamic mode
+  cache_enabled: true
+  cache_ttl_hours: 24
+
+  # Filters (applied after fetching)
+  # index_filter: "LQ45"  # Options: LQ45, IDX30, null (no filter)
+  # sector_filter:        # Filter by sectors (uncomment to use)
+  #   - Financial Services
+  #   - Energy
+  # max_stocks: 50        # Limit number of stocks (null = no limit)
+  # exclude_tickers: []   # Tickers to always exclude
+
+  # Fallback tickers (used when mode is 'static' or as last resort)
   tickers:
     - BBCA
     - BBRI
