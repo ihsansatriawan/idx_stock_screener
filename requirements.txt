@@ -2,6 +2,7 @@
 
 # Data fetching
 yfinance>=0.2.30
+requests>=2.31.0
 
 # Technical analysis
 pandas-ta>=0.4.71b0

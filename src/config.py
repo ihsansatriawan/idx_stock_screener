@@ -59,15 +59,27 @@ def validate_config(config: dict) -> Tuple[bool, str]:
             return False, "google_sheets.credentials_path is required"
 
     # Check universe
-    tickers = config.get('universe', {}).get('tickers', [])
-    if not tickers:
-        return False, "universe.tickers cannot be empty"
+    universe_config = config.get('universe', {})
+    mode = universe_config.get('mode', 'static')
 
-    if not isinstance(tickers, list):
-        return False, "universe.tickers must be a list"
-
-    if len(tickers) != 20:
-        return False, f"universe.tickers should have 20 stocks (found {len(tickers)})"
+    if mode == 'static':
+        tickers = universe_config.get('tickers', [])
+        if not tickers:
+            return False, "universe.tickers cannot be empty when mode is 'static'"
+        if not isinstance(tickers, list):
+            return False, "universe.tickers must be a list"
+    elif mode == 'dynamic':
+        source_priority = universe_config.get('source_priority', [])
+        valid_sources = {'idx', 'sectors', 'static', 'config'}
+        for source in source_priority:
+            if source not in valid_sources:
+                return False, f"Invalid source in universe.source_priority: {source}"
+        if 'config' not in source_priority:
+            tickers = universe_config.get('tickers', [])
+            if not tickers:
+                return False, "universe.tickers required as fallback when 'config' not in source_priority"
+    else:
+        return False, f"Invalid universe.mode: {mode} (must be 'static' or 'dynamic')"
 
     # Check risk management
     max_sl = config.get('risk', {}).get('max_sl_percent')
